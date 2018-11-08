@@ -12,7 +12,7 @@ namespace Test_mail_generator
     {
         public static void GenerateLetter(int count, int bodySize)
         {
-            string to = @"fenran@yandex.ru";
+            string to = @"" + count + "test@test.com";
             string from = @"" + count + "test@test.com";
             string subject = @"Generated letter No " + count + "";
             string body = @"This letter number " + count + " was generated to fill the mailbox with test letters. It may contain different attachments as well as a different amount of textual load of different languages.\nText:\n" + RandomString(bodySize);
@@ -90,9 +90,11 @@ namespace Test_mail_generator
         static void Main()
         {
             int letterCount = 10;
+            Random r = new Random();
+
             for (var i = 0; i < letterCount; i++)
             {
-                GenerateLetter(i, 1000);
+                GenerateLetter(i, r.Next(100, 1100));
             }
             Console.WriteLine("All letters saved.");
             Console.ReadLine();
