@@ -10,90 +10,116 @@ namespace Test_mail_generator
 {
     class Program
     {
-        public static void GenerateLetter(int count, int bodySize, int countAttach)
+        private static void GenerateLetter(int count, int bodySize, int countAttach)
         {
-            string to = @"" + count + "test@test.com";
             string from = @"" + count + "test@test.com";
-            string subject = @"Generated letter No " + count + "";
-            string body = @"This letter number " + count + " was generated to fill the mailbox with test letters. It may contain different attachments as well as a different amount of textual load of different languages.\nText:\n" + RandomString(bodySize);
-            string emailDir = @"D:\\StudioSolution\\Test_mail_generator\\Test_mail_generator\\bin\\Debug\\Mails";
-            string msgName = @"" + count + "_test_letter.eml";
-            string attachPath = @"D:\\StudioSolution\\Test_mail_generator\\Test_mail_generator\\bin\\Debug\\Mails\\Attachments\\attach.eml";
+            string to = @"" + count + "test@test.com";
+            string subject = @"Generated letter No " + count + ", has " + countAttach + " attachments";
+            string body = @"This letter number " + count + " was generated to fill the mailbox with test letters. " +
+                           "It may contain " + countAttach + " attachments as well as a different amount of textual load of different languages.\n" +
+                           "Text:\n" + RandomString(bodySize);
 
-            Console.WriteLine("Saving letter...");
+            string emailDir = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\bin\Debug\Mails"));
+            string attachPath = @"" + emailDir + "\\Attachments\\attach.csv";
 
             using (var client = new SmtpClient())
             {
                 MailMessage msg = new MailMessage(from, to, subject, body);
-                for (var k = 0; k < countAttach; k++)
+
+                Parallel.For(0, countAttach, k =>
                 {
                     msg.Attachments.Add(new Attachment(attachPath));
-                }
+                });
+
                 client.UseDefaultCredentials = true;
                 client.DeliveryMethod = SmtpDeliveryMethod.SpecifiedPickupDirectory;
                 client.PickupDirectoryLocation = emailDir;
                 client.Send(msg);
             }
-
-            var defaultMsgPath = new DirectoryInfo(emailDir).GetFiles().OrderByDescending(f => f.LastWriteTime).First();
-            var realMsgPath = Path.Combine(emailDir, msgName);
-
-            try
-            {
-                File.Move(defaultMsgPath.FullName, realMsgPath);
-                Console.WriteLine("Letter " + count + " saved.");
-            }
-            catch (System.IO.IOException e)
-            {
-                Console.WriteLine("Overwriting existing file...");
-                File.Delete(realMsgPath);
-                File.Move(defaultMsgPath.FullName, realMsgPath);
-                Console.WriteLine("Letter " + count + " overwrited.");
-            }
         }
 
-        public static string RandomString(int size)
+        private static string RandomString(int size)
         {
             StringBuilder builder = new StringBuilder();
             Random random = new Random();
-            char ch;
+
             int charPerStr = 100;
-            int counter;
+            int counter = charPerStr;
 
             if (size > charPerStr)
             {
-                counter = (int)Math.Floor((double)(size / charPerStr));
-            }
-            else
-            {
-                counter = charPerStr;
+                counter = (int)Math.Truncate((double)(size / charPerStr));
             }
 
-            for (int i = 0; i < counter; i++)
+            for (var i = 0; i < counter; i++)
             {
                 for (int j = 0; j < charPerStr; j++)
                 {
-                    ch = Convert.ToChar(Convert.ToInt32(Math.Floor(26 * random.NextDouble() + 65)));
-
-                    builder.Append(ch);
+                    builder.Append((char)random.Next(48, 128));
                 }
-                builder.Append("\n");
+                builder.Append(Environment.NewLine);
             }
             return builder.ToString();
         }
 
-        static void Main()
+        private static void CreateLetters()
         {
-            int letterCount = 100;
             Random r = new Random();
+            int letterCount = 0;
 
-            for (var i = 0; i < letterCount; i++)
+            Console.Write("Enter letters count (10 by default): ");
+
+            string value = Console.ReadLine();
+
+            if (value.Length < 1)
+                value = "10";
+
+            var buffer = 0;
+
+            for (int i = 0; i < value.Length; i++)
             {
-                GenerateLetter(i, r.Next(100, 1100), r.Next(0, 1000));
+                buffer = buffer * 10 + (value[i] - '0');
             }
 
-            Console.WriteLine("All letters saved.");
-            Console.ReadLine();
+            letterCount += buffer;
+
+            ClearFolder();
+
+            Console.Write("\nStarting generation ... \n\n");
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var complitedTasks = 0;
+
+            Parallel.For(0, letterCount, i =>
+            {
+                GenerateLetter(i, r.Next(100, 1000), r.Next(10, 1010));
+                Console.Write("\rTasks complited: " + ++complitedTasks + " [ " + Math.Round(((double)complitedTasks / letterCount) * 100) + "% ]");
+            });
+
+            stopwatch.Stop();
+
+            Console.WriteLine("\n\nAll tasks done: [ " + stopwatch.Elapsed + " ]\n\nPress key to close ... ");
+            Console.ReadKey();
+        }
+
+        private static void ClearFolder()
+        {
+            Console.Write("\nDeleting old letters ...");
+
+            DirectoryInfo directory = new DirectoryInfo(
+                Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\bin\Debug\Mails")));
+
+            Parallel.ForEach(directory.GetFiles(), file =>
+            {
+                file.Delete();
+            });
+
+            Console.Write("\rDeleting old letters ... Done\n");
+        }
+
+        static void Main()
+        {
+            CreateLetters();
         }
     }
 }
